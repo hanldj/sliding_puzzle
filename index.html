@@ -3,44 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 拼圖 - 穩定遞移版</title>
+    <title>AI 拼圖 - 專業浮層通知版</title>
     <style>
-        :root { --primary: #3498db; --bg: #f0f3f5; }
+        :root { --primary: #3498db; --bg: #f4f7f9; --success: #27ae60; }
         body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 15px; margin: 0; }
-
+        
         /* 統計面板 */
-        .stats-panel { background: white; padding: 10px 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); width: 100%; max-width: 450px; display: flex; justify-content: space-around; margin-bottom: 15px; }
+        .stats-panel { background: white; padding: 10px 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); width: 100%; max-width: 450px; display: flex; justify-content: space-around; margin-bottom: 12px; }
         .stat-item { text-align: center; }
         .stat-label { color: #888; display: block; font-size: 11px; }
         .stat-val { font-weight: bold; font-size: 18px; color: var(--primary); }
 
         /* 歷史紀錄區塊 */
-        .history-section { background: white; padding: 12px; border-radius: 12px; width: 100%; max-width: 450px; margin-bottom: 15px; display: none; }
+        .history-section { background: white; padding: 12px; border-radius: 12px; width: 100%; max-width: 450px; margin-bottom: 12px; display: none; }
         .history-title { font-size: 12px; color: #666; margin-bottom: 10px; font-weight: bold; }
         .history-list { display: flex; gap: 12px; overflow-x: auto; padding: 5px; }
-
         .history-container { position: relative; flex-shrink: 0; }
         .history-item { width: 65px; height: 65px; border-radius: 8px; cursor: pointer; object-fit: cover; border: 2px solid transparent; transition: 0.2s; }
-        .history-item:hover { border-color: var(--primary); transform: scale(1.05); }
-        .history-badge {
-            position: absolute; top: -5px; left: -5px;
-            background: var(--primary); color: white;
-            font-size: 10px; width: 18px; height: 18px;
-            border-radius: 50%; display: flex;
-            justify-content: center; align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            font-weight: bold; pointer-events: none;
-        }
+        .history-badge { position: absolute; top: -5px; left: -5px; background: var(--primary); color: white; font-size: 10px; width: 18px; height: 18px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; }
 
         .upload-area { background: white; padding: 15px; border-radius: 12px; width: 100%; max-width: 450px; text-align: center; margin-bottom: 15px; }
         #custom-label { display: block; border: 2px dashed #ccc; padding: 15px; border-radius: 8px; cursor: pointer; color: #666; font-size: 14px; }
-
+        
         #board-container { position: relative; background: #ddd; border: 4px solid #fff; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; overflow: hidden; }
         .tile { position: absolute; box-sizing: border-box; border: 1px solid #fff; background-repeat: no-repeat; transition: transform 0.2s ease-out; cursor: pointer; touch-action: manipulation; }
         .tile.empty { background: none !important; border: none; cursor: default; }
-
+        
         #shuffle-btn { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 25px; font-size: 16px; margin-top: 15px; cursor: pointer; width: 100%; max-width: 450px; display: none; }
-        #msg { color: #27ae60; font-weight: bold; margin-top: 10px; display: none; text-align: center; font-size: 1.2rem; }
+        #shuffle-btn:disabled { background: #ccc; }
+
+        /* === 核心修正：破關彈窗視窗 (Modal) === */
+        #win-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center;
+            z-index: 1000; backdrop-filter: blur(4px);
+        }
+        .win-modal {
+            background: white; padding: 30px; border-radius: 20px; text-align: center;
+            width: 80%; max-width: 300px; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .win-modal h2 { color: var(--success); margin-top: 0; }
+        .win-modal p { color: #555; margin: 10px 0; }
+        .close-btn { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 20px; margin-top: 15px; cursor: pointer; font-weight: bold; width: 100%; }
     </style>
 </head>
 <body>
@@ -57,13 +62,22 @@
     </div>
 
     <div class="upload-area">
-        <label id="custom-label" for="img-input">📁 選擇照片 (新照片將排在 1 號順位)</label>
+        <label id="custom-label" for="img-input">📁 選擇照片或由歷史清單啟動</label>
         <input type="file" id="img-input" accept="image/*" style="display:none">
     </div>
 
     <div id="board-container"></div>
     <button id="shuffle-btn">開始洗牌</button>
-    <div id="msg">🎉 恭喜完成拼圖！ 🎉</div>
+
+    <div id="win-overlay">
+        <div class="win-modal">
+            <h2>🎉 恭喜完成！</h2>
+            <p>最終時間：<span id="final-time">00:00</span></p>
+            <p>最終步數：<span id="final-steps">0</span></p>
+            <div id="new-record-tag" style="display:none; color: #f39c12; font-weight: bold; margin-bottom: 10px;">🏆 創下新紀錄！</div>
+            <button class="close-btn" onclick="closeWinModal()">太棒了</button>
+        </div>
+    </div>
 
 <script>
     const container = document.getElementById('board-container');
@@ -74,7 +88,7 @@
     const bestDisplay = document.getElementById('best-record');
     const hSec = document.getElementById('history-sec');
     const hList = document.getElementById('history-list');
-    const msg = document.getElementById('msg');
+    const winOverlay = document.getElementById('win-overlay');
 
     let rows, cols, tiles = [], emptyTile = null;
     let photoUrl = "", stepCount = 0, timerInterval = null, seconds = 0;
@@ -98,15 +112,8 @@
             else if (ratio <= 0.8) { cols = 3; rows = 4; }
             else { cols = 3; rows = 3; }
             photoUrl = url;
-
-            // 重要：點擊舊縮圖也應該更新順位到 1 號
-            if (updateOrder) {
-                saveImageToHistory(url);
-            } else {
-                // 如果是直接點擊縮圖，依然執行一次「移動到首位」的動作
-                reorderHistory(url);
-            }
-
+            if (updateOrder) saveImageToHistory(url);
+            else reorderHistory(url);
             resetStats();
             hasBeenShuffled = false;
             requestAnimationFrame(() => setupBoard());
@@ -114,92 +121,55 @@
         img.src = url;
     }
 
-    // 關鍵修正 1：壓縮圖片以防止儲存空間爆滿
+    // 縮圖壓縮儲存
     function saveImageToHistory(url) {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            const maxThumbSize = 200; // 縮圖大小
-            canvas.width = maxThumbSize;
-            canvas.height = maxThumbSize;
-            // 將圖片中心裁切並縮小
+            const maxThumb = 200;
+            canvas.width = maxThumb; canvas.height = maxThumb;
             const size = Math.min(img.width, img.height);
-            ctx.drawImage(img, (img.width-size)/2, (img.height-size)/2, size, size, 0, 0, maxThumbSize, maxThumbSize);
-            const compressedUrl = canvas.toDataURL('image/jpeg', 0.7); // 壓縮品質 0.7
-
-            reorderHistory(compressedUrl);
+            ctx.drawImage(img, (img.width-size)/2, (img.height-size)/2, size, size, 0, 0, maxThumb, maxThumb);
+            reorderHistory(canvas.toDataURL('image/jpeg', 0.7));
         };
         img.src = url;
     }
 
-    // 關鍵修正 2：嚴格執行 1-5 順位遞移邏輯
+    // 歷史順位遞移邏輯 (1-5 號)
     function reorderHistory(url) {
         let history = JSON.parse(localStorage.getItem('puzzle_history') || "[]");
-
-        // 1. 移除已存在的相同圖片
         history = history.filter(item => item !== url);
-
-        // 2. 插入到最前面成為 1 號
         history.unshift(url);
-
-        // 3. 嚴格限制 5 張，刪除最末位
-        if (history.length > 5) {
-            history = history.slice(0, 5);
-        }
-
-        try {
-            localStorage.setItem('puzzle_history', JSON.stringify(history));
-            displayHistory();
-        } catch (e) {
-            // 如果還是爆滿，清空歷史紀錄重新開始 (保險機制)
-            localStorage.removeItem('puzzle_history');
-            console.warn("存儲異常，已重置歷史紀錄。");
-        }
+        if (history.length > 5) history = history.slice(0, 5);
+        localStorage.setItem('puzzle_history', JSON.stringify(history));
+        displayHistory();
     }
 
     function displayHistory() {
         const history = JSON.parse(localStorage.getItem('puzzle_history') || "[]");
-        if (history.length === 0) {
-            hSec.style.display = "none";
-            return;
-        }
+        if (history.length === 0) return;
         hSec.style.display = "block";
         hList.innerHTML = "";
-
-        history.forEach((url, index) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'history-container';
-            const img = document.createElement('img');
-            img.src = url;
-            img.className = 'history-item';
+        history.forEach((url, idx) => {
+            const wrap = document.createElement('div'); wrap.className = 'history-container';
+            const img = document.createElement('img'); img.src = url; img.className = 'history-item';
             img.onclick = () => processImage(url, false);
-
-            const badge = document.createElement('div');
-            badge.className = 'history-badge';
-            badge.innerText = index + 1;
-
-            wrap.appendChild(img);
-            wrap.appendChild(badge);
-            hList.appendChild(wrap);
+            const badge = document.createElement('div'); badge.className = 'history-badge'; badge.innerText = idx + 1;
+            wrap.appendChild(img); wrap.appendChild(badge); hList.appendChild(wrap);
         });
     }
 
-    // --- 遊戲板初始化與邏輯 (維持穩定) ---
     function setupBoard() {
-        container.innerHTML = "";
-        container.style.display = "block";
-        sBtn.style.display = "block";
+        container.innerHTML = ""; container.style.display = "block"; sBtn.style.display = "block";
         const screenW = Math.min(window.innerWidth * 0.9, 450);
         const tSize = Math.floor(screenW / cols);
         const boardW = tSize * cols, boardH = tSize * rows;
         container.style.width = boardW + "px"; container.style.height = boardH + "px";
-
         tiles = [];
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                const tile = document.createElement('div');
-                tile.className = 'tile';
+                const tile = document.createElement('div'); tile.className = 'tile';
                 tile.style.width = tSize + "px"; tile.style.height = tSize + "px";
                 updateTileVisual(tile, r, c, tSize);
                 tile.style.backgroundImage = `url(${photoUrl})`;
@@ -208,17 +178,13 @@
                 tile.dataset.targetR = r; tile.dataset.targetC = c;
                 if (r === rows - 1 && c === cols - 1) { tile.classList.add('empty'); emptyTile = tile; }
                 else { tile.onclick = () => tryMove(tile); }
-                container.appendChild(tile);
-                tiles.push(tile);
+                container.appendChild(tile); tiles.push(tile);
             }
         }
         updateBestDisplay();
     }
 
-    function updateTileVisual(tile, r, c, size) {
-        tile.style.transform = `translate(${c * size}px, ${r * size}px)`;
-        tile.dataset.currR = r; tile.dataset.currC = c;
-    }
+    function updateTileVisual(t, r, c, s) { t.style.transform = `translate(${c * s}px, ${r * s}px)`; t.dataset.currR = r; t.dataset.currC = c; }
 
     function tryMove(tile, isShuffleLogic = false) {
         if (!isShuffleLogic && !hasBeenShuffled) return false;
@@ -227,10 +193,9 @@
         if (Math.abs(r - er) + Math.abs(c - ec) === 1) {
             const tSize = container.offsetWidth / cols;
             updateTileVisual(tile, er, ec, tSize);
-            updateTilePositionData(emptyTile, r, c, tSize);
+            updateTileVisual(emptyTile, r, c, tSize);
             if (!isShuffleLogic && hasBeenShuffled) {
-                stepCount++;
-                stepDisplay.innerText = stepCount;
+                stepCount++; stepDisplay.innerText = stepCount;
                 if (!gameActive) startTimer();
                 checkWin();
             }
@@ -239,17 +204,8 @@
         return false;
     }
 
-    function updateTilePositionData(tile, r, c, size) {
-        tile.dataset.currR = r; tile.dataset.currC = c;
-        tile.style.transform = `translate(${c * size}px, ${r * size}px)`;
-    }
-
     sBtn.onclick = () => {
-        resetStats();
-        msg.style.display = "none";
-        let m = 0; const totalM = 120;
-        sBtn.disabled = true;
-        hasBeenShuffled = false;
+        resetStats(); let m = 0; const totalM = 120; sBtn.disabled = true; hasBeenShuffled = false;
         const interval = setInterval(() => {
             const er = parseInt(emptyTile.dataset.currR), ec = parseInt(emptyTile.dataset.currC);
             const neighbors = tiles.filter(t => (Math.abs(parseInt(t.dataset.currR) - er) + Math.abs(parseInt(t.dataset.currC) - ec)) === 1);
@@ -264,20 +220,35 @@
     function checkWin() {
         if (!hasBeenShuffled || !gameActive) return;
         const win = tiles.every(t => t.dataset.currR == t.dataset.targetR && t.dataset.currC == t.dataset.targetC);
-        if (win) { clearInterval(timerInterval); gameActive = false; msg.style.display = "block"; saveRecord(); }
+        if (win) {
+            clearInterval(timerInterval); gameActive = false;
+            // 顯示彈窗視窗
+            document.getElementById('final-time').innerText = formatTime(seconds);
+            document.getElementById('final-steps').innerText = stepCount;
+            winOverlay.style.display = "flex";
+            saveRecord();
+        }
     }
+
+    function closeWinModal() { winOverlay.style.display = "none"; }
 
     function saveRecord() {
         const key = `puzzle_best_${cols}x${rows}`;
-        const currentBest = localStorage.getItem(key);
-        const parsedBest = parseInt(currentBest);
-        if (seconds > 0) { if (!currentBest || isNaN(parsedBest) || parsedBest <= 0 || seconds < parsedBest) { localStorage.setItem(key, seconds); updateBestDisplay(); } }
+        const best = localStorage.getItem(key);
+        const isNew = (!best || parseInt(best) <= 0 || seconds < parseInt(best));
+        if (seconds > 0 && isNew) {
+            localStorage.setItem(key, seconds);
+            document.getElementById('new-record-tag').style.display = "block";
+            updateBestDisplay();
+        } else {
+            document.getElementById('new-record-tag').style.display = "none";
+        }
     }
 
     function updateBestDisplay() {
         const key = `puzzle_best_${cols}x${rows}`;
-        const best = localStorage.getItem(key);
-        bestDisplay.innerText = (best && parseInt(best) > 0) ? formatTime(parseInt(best)) : "--:--";
+        const b = localStorage.getItem(key);
+        bestDisplay.innerText = (b && parseInt(b) > 0) ? formatTime(parseInt(b)) : "--:--";
     }
 
     function resetStats() { clearInterval(timerInterval); seconds = 0; stepCount = 0; timerDisplay.innerText = "00:00"; stepDisplay.innerText = "0"; gameActive = false; }
